@@ -1,0 +1,10 @@
+---
+title: "Group 13 - Assignment 4"
+author: "Kristine Zenner Torp, Manon Grandjean, Marcus Alexander Dyhr, Martine Lind Jensen, Miriam Diaz"
+date: "24/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```

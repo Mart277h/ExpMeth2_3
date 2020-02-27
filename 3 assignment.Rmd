@@ -1,0 +1,316 @@
+---
+title: "Group 13 - Assignment 3"
+author: "Kristine Zenner Torp, Manon Grandjean, Martine Lind Jensen, Miriam Diaz de Lamo"
+date: "13/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+pacman::p_load(tidyverse, reshape2, pracma)
+```
+
+# Data 
+
+Load data and design as time-series:
+```{r}
+##data
+fmri<-as.matrix(read.csv("portfolio_assignment3_aud_fmri_data37.csv", header=FALSE))
+
+##making it a time-series
+fmri2<-ts(fmri)
+
+##design
+fmrides<-as.matrix(read.csv("portfolio_assignment3_aud_fmri_design.csv", header=FALSE))
+
+##making it a time-series
+fmrides2<-ts(fmrides)
+```
+
+# Tasks 
+
+## Initial figures 
+
+### 1. Make three figures:
+
+### 1.a. 
+A figure with lineplots of the data from all participants as a function of time in one figure. Note how much the baseline signal can vary between participants.
+
+```{r}
+#Making a plot for individual participants  
+ggplot(melt(fmri2), aes(x=Var1, y=value, col=Var2))+
+  geom_line()
+```
+
+
+
+### 1.b. 
+A boxplot with the signal intensity for each participant. Note how much the baseline signal can vary between participants.
+
+```{r}
+#Make a boxplot with individual boxplots 
+ggplot(melt(fmri2), aes(x=Var1, y=value, col=Var2))+
+  geom_boxplot()
+```
+
+
+### 1.c. 
+A lineplots figure with the model covariates.
+
+```{r}
+#In separate plots 
+plot.ts(fmrides2, plot.type = "m")
+
+#In one plot 
+ggplot(melt(fmrides2), aes(x=Var1, y=value, col=Var2))+
+  geom_line()
+```
+
+
+## Investigating model
+
+### 2. 
+Based on the shape of the model: How many stories did the participants listen to in each condition (you can also automatise this, e.g. using “findpeaks” in library(pracma))?
+
+*There are 15 different stories in each condition.*
+
+```{r}
+#First column = first condition, there is 15 stories in this condition 
+nrow(findpeaks(as.numeric(fmrides2[,1])))
+
+#Second column, second condition, there is 15 stories in this condition
+nrow(findpeaks(as.numeric(fmrides2[,2])))
+```
+
+### 3.a. 
+Are the two model covariates correlated?
+
+*They are correlated with a low p-value and a large effect, r(398) = -0.54, p < 0.01*
+
+```{r}
+des_output <- cor.test(fmrides2[,1], fmrides2[,2], method = "pearson")
+#Yes they are, with a low p-value and a large effect 
+
+des_output
+```
+
+
+### 3.b. 
+Have the covariates been mean-centered?
+
+```{r}
+#Testing the first column 
+round(mean(fmrides2[,1]), digits = 3)
+#Testing the second column 
+round(mean(fmrides2[,2]), digits = 3)                                                       
+
+#Yes they have been mean-centered 
+```
+
+
+### 4. 
+Please report the percentage of shared variance in the two covariates.
+
+```{r}
+#R is the correlation coefficient 
+r <- des_output$estimate
+#We square R 
+r^2
+```
+
+
+## Analyses
+
+Single participant:
+
+### 5. 
+Pick one participant’s data set. Conduct 6 analyses using lm():
+
+```{r}
+#Choosing participant 22
+fmri_22 <- fmri2[,22]
+```
+
+
+### 5.a. 
+Fit the model as it is, including intercept.
+
+```{r}
+model5a <- lm(fmri_22 ~ fmrides2)
+summary(model5a)
+```
+
+
+### 5.b. 
+Fit the model as it is, excluding intercept.
+
+```{r}
+model5b <- lm(fmri_22 ~ fmrides2 + 0)
+summary(model5b)
+```
+
+
+### 5.c. 
+Fit only the 1st covariate as a model.
+```{r}
+model5c <- lm(fmri_22 ~ fmrides2[,1])
+summary(model5c)
+```
+
+
+### 5.d. 
+Fit only the 2nd covariate as a model.
+
+```{r}
+model5d <- lm(fmri_22 ~ fmrides2[,2])
+summary(model5d)
+```
+
+
+The residuals represent the variance left when fitting a model. They are thus data that have been “cleaned” from the variance explained by the model. We can use those “cleaned” data to fit another model on. This is similar to using a type III sum of squares approach to your statistics.
+
+### 5.e. 
+Fit the 2nd covariate to the residuals from analysis 5.c., the 1st covariate only analysis
+
+```{r}
+model5e <- lm(model5c$residuals ~ fmrides2[,2])
+
+summary(model5e)
+```
+
+
+### 5.f. 
+Fit the 1st covariate to the resistuals from 5.d., the 2nd covariate only analysis
+
+```{r}
+model5f <- lm(model5d$residuals ~ fmrides2[,1])
+summary(model5f)
+```
+
+
+### 5.g. 
+Does the order in which the predictor variables are fitted to the data matter for the estimates? If it does, what can explain this?
+
+*Comparing 5e and 5f models with residuals, we find that the linear regression changes. This means that if the residuals are spread differently, the regressions are different. Therefore it matters in which order you put the predictors, because they explain the variance differently. So the first predictor always explains most variance, and then the second predictor explains the rest.*
+
+
+## Group level analyses
+
+### 6. 
+Fit the full model to each of the 37 participants’ data and extract the coefficients for each participant. (hint: the full participant data frame can be set as outcome. Alternatively, you can change the data structure and use lmList from assignement 1 (remember pool=FALSE)).
+
+```{r}
+full_model <- lm(fmri2 ~ fmrides2)
+
+coef_fm <- coef(full_model)
+
+coef_fm
+```
+
+### 6.a. 
+Test the two individual hypotheses that the set of coefficient from each covariate is different from zero across the whole group (similar to assignment 1).
+
+*The coefficients modelled with the first covariate is significantly different from zero (M = 5.14, SD = 1.88, t(36)= 16.61, p < 0.01)*
+*The coefficients modelled with the second covariate is significantly different from zero (M = 5.07, SD = 1.98, t(36)= 15.6, p < 0.01)*
+```{r}
+#Testing whether coefficients from the covariates are equal to zero 
+#Covariate 1 
+t.test(coef_fm[2,], mu = 0, alternative = "two.sided")
+
+#Calculating standard deviation
+sd(coef_fm[2,])
+
+#Covariate 2 
+t.test(coef_fm[3,], mu = 0, alternative = "two.sided")
+
+#Calculating standard deviation
+sd(coef_fm[3,])
+```
+
+Make a contrast that investigates the difference between the two covariates, i.e. the two types of stories (hint: subtraction).
+
+### 6.b. 
+Test the hypothesis that the contrast is different from zero across participants.
+
+*The contrast is not significantly different from zero (M = 0.067, SD = 0.59, t(36)= 0.696, p = 0.49)*
+
+```{r}
+#Making a contrast matrix
+fmri2_des_con <- matrix(nrow = 3, ncol = 37)
+
+#Making the contrast by subtracting one covariates coefficient  from the other 
+fmri2_des_con[1,] <- (coef_fm[2,])-(coef_fm[3,])
+
+#Making a one sampled t-test 
+t.test(fmri2_des_con[1,], mu = 0, alternative = "two.sided")
+
+#Calculating standard deviation
+sd(fmri2_des_con[1,])
+```
+
+### 6.c. 
+Make a bar diagram including the mean effect of the two coefficents and the contrast, including error bars (indicating standard error of mean).
+
+```{r}
+fmri2_des_con[2,] <- coef_fm[2,]
+fmri2_des_con[3,] <- coef_fm[3,]
+
+
+ggplot(melt(fmri2_des_con), aes(x = Var1, y = value), fill = as.factor(Var1)) + 
+  geom_bar(stat='summary', fun.y = mean, width = 0.5) + 
+  geom_errorbar(stat = 'summary', fun.data = mean_se, width = 0.2)
+```
+
+
+## Adding a covariate
+
+### 7.a. 
+For each partipant, add a covariate that models the effect of time (hint: 1:400).
+```{r}
+#Making a new 
+fmrides2_time <- matrix(nrow = 400, ncol = 3)
+
+fmrides2_time[,1] <- (1:400) 
+fmrides2_time[,2] <- fmrides2[,1]
+fmrides2_time[,3] <- fmrides2[,2]
+
+time_model <- lm(fmri2~fmrides2_time)
+
+coef(time_model)
+
+```
+
+
+### 7.b. 
+Does that improve the group results in term of higher t-values?
+```{r}
+time_model <- lm(fmri2~fmrides2_time)
+
+coef_tm <- time_model$coefficients
+
+t.test(coef_tm[2,], mu = 0, alternative = "two.sided")
+
+t.test(coef_tm[3,], mu = 0, alternative = "two.sided")
+
+t.test(coef_tm[4,], mu = 0, alternative = "two.sided")
+
+```
+
+### 8. 
+Make a bar diagram like in 6.c., but display effects as percent signal change (hint: percent signal change is slope divided by intercept).
+```{r}
+#Make three columns that represents the 3 covariates as their slope divided by intercept
+
+bar_di <- matrix(nrow = 3, ncol=37)
+
+bar_di[1,] <- coef_tm[2,]/coef_tm[1,]
+bar_di[2,] <- coef_tm[3,]/coef_tm[1,]
+bar_di[3,] <- coef_tm[4,]/coef_tm[1,]
+
+ggplot(melt(bar_di), aes(x = Var1, y = value), fill = as.factor(Var1)) + 
+  geom_bar(stat='summary', fun.y = mean, width = 0.5) + 
+  geom_errorbar(stat = 'summary', fun.data = mean_se, width = 0.2)
+```
+
+
